@@ -1,0 +1,1643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>GHCL | Employee Attendance</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+
+  <!-- Design disabled for now; enable when the visual layout is ready.
+  <script src="https://cdn.tailwindcss.com"></script>
+  -->
+  <!-- Face API JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      background: #f3f5f7;
+      color: #202a33;
+      font-family: "Segoe UI", Arial, sans-serif;
+      line-height: 1.45;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 18px;
+      background: #fff;
+      border-bottom: 1px solid #d9dfe5;
+    }
+
+    header h1,
+    header p {
+      margin: 0;
+    }
+
+    header h1 {
+      font-size: 16px;
+    }
+
+    #liveClock {
+      color: #64717c;
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    main {
+      display: flex;
+      width: min(100%, 520px);
+      flex-direction: column;
+      gap: 12px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    main > div:not(#cameraViewport) {
+      padding: 12px;
+      background: #fff;
+      border: 1px solid #d9dfe5;
+      border-radius: 6px;
+    }
+
+    #geoPill,
+    #geoPill > div:first-child,
+    #employeeSearchRow {
+      display: flex;
+    }
+
+    #geoPill {
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    #geoPill > div:first-child {
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    #geoTitle {
+      font-weight: 600;
+    }
+
+    #geoSubtitle,
+    #punchHint,
+    #enrollHint {
+      color: #64717c;
+      font-size: 12px;
+    }
+
+    #empInput {
+      min-width: 0;
+      flex: 1;
+      padding: 9px 10px;
+      border: 1px solid #c7d0d9;
+      border-radius: 4px;
+      color: #202a33;
+      background: #fff;
+      font: inherit;
+    }
+
+    button {
+      padding: 8px 12px;
+      border: 1px solid #c7d0d9;
+      border-radius: 4px;
+      color: #26333d;
+      background: #f7f9fa;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    #btnSearchEmp,
+    #btnPunchIn,
+    #btnPunchOut,
+    #btnEnroll {
+      border-color: #176b67;
+      color: #fff;
+      background: #176b67;
+    }
+
+    #cameraViewport {
+      margin: 0 auto;
+      background: #161b20;
+      border: 1px solid #c7d0d9;
+      border-radius: 6px;
+    }
+
+    #scannerOval {
+      border: 2px dashed rgba(255, 255, 255, 0.75);
+      border-radius: 50%;
+    }
+
+    #scannerOval.active {
+      border-style: solid;
+      border-color: #36b37e;
+    }
+
+    #scannerOval.error {
+      border-style: solid;
+      border-color: #d9534f;
+    }
+
+    #cameraViewport > div:last-child {
+      position: absolute;
+      right: 12px;
+      bottom: 12px;
+      left: 12px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    #modelLoader {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.94);
+      color: #202a33;
+      text-align: center;
+    }
+
+    #cameraViewport {
+      position: relative;
+      width: min(100%, 480px);
+      aspect-ratio: 4 / 3;
+      max-height: 360px;
+      overflow: hidden;
+    }
+
+    #videoElement,
+    #overlayCanvas {
+      width: 100%;
+      height: 100%;
+    }
+
+    #videoElement {
+      object-fit: cover;
+      transform: scaleX(-1);
+    }
+
+    #overlayCanvas {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      transform: scaleX(-1);
+    }
+
+    #scannerOval {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 190px;
+      height: 240px;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+
+    #modelLoader {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+    }
+
+    #livenessInstruction {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      z-index: 1;
+    }
+
+    #badgeFace,
+    #badgeLiveness {
+      position: relative;
+      z-index: 1;
+    }
+
+    #statusModal:not(.hidden) {
+      position: fixed;
+      inset: 0;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(20, 29, 36, 0.65);
+    }
+
+    #statusModal > div {
+      width: min(100%, 400px);
+      padding: 20px;
+      border: 1px solid #d9dfe5;
+      border-radius: 6px;
+      background: #fff;
+      text-align: center;
+    }
+
+    @media (max-width: 520px) {
+      header {
+        align-items: flex-start;
+        padding: 10px 12px;
+      }
+
+      main {
+        padding: 12px;
+      }
+
+      header button {
+        padding: 7px 8px;
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between">
+
+  <!-- Top Navigation & Status Bar -->
+  <header class="bg-slate-800/90 backdrop-blur border-b border-slate-700 px-4 py-3 sticky top-0 z-30 flex items-center justify-between">
+    <div class="flex items-center space-x-2">
+      <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shadow-md text-base">
+        🏢
+      </div>
+      <div>
+        <h1 class="text-sm font-semibold text-white tracking-wide">Employee Attendance</h1>
+        <p id="liveClock" class="text-xs text-slate-400 font-mono">--:--:--</p>
+      </div>
+    </div>
+
+    <!-- Header Right Controls -->
+    <div class="flex items-center space-x-2 shrink-0">
+      <!-- Mode Switcher -->
+      <div class="flex items-center space-x-1 bg-slate-900/80 p-1 rounded-lg border border-slate-700 text-xs">
+        <button id="tabPunch" onclick="switchTab('punch')" class="px-2.5 py-1.5 rounded-md font-medium bg-indigo-600 text-white transition">
+          Attendance
+        </button>
+        <button id="tabEnroll" onclick="switchTab('enroll')" class="px-2.5 py-1.5 rounded-md font-medium text-slate-400 hover:text-white transition">
+          User Registration
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Area -->
+  <main class="flex-1 max-w-md w-full mx-auto p-4 flex flex-col space-y-3">
+
+    <!-- Location Geofence Pill -->
+    <div id="geoPill" class="bg-slate-800 border border-slate-700 rounded-xl p-3 flex items-center justify-between shadow-sm transition">
+      <div class="flex items-center space-x-3 overflow-hidden">
+        <span id="geoIcon" class="text-xl">📍</span>
+        <div class="truncate">
+          <div id="geoTitle" class="text-xs font-bold text-slate-300">Checking work location</div>
+          <div id="geoSubtitle" class="text-[11px] text-slate-400 truncate">Allow location access to verify your site</div>
+        </div>
+      </div>
+          <button onclick="refreshGPS()" title="Refresh location" aria-label="Refresh location" class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-slate-300 transition">
+        ↻
+      </button>
+    </div>
+
+    <!-- Employee Identifier / Profile Bar -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-3 shadow-sm">
+      <div id="employeeSearchRow" class="flex items-center space-x-2">
+        <input
+          type="text"
+          id="empInput"
+          placeholder="Employee ID or work email"
+          class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-mono uppercase"
+        />
+        <button
+          id="btnSearchEmp"
+          onclick="searchEmployee()"
+          class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg text-xs font-semibold tracking-wide transition shadow"
+        >
+          Verify
+        </button>
+      </div>
+
+      <!-- Employee Info Strip -->
+      <div id="empInfoStrip" class="hidden mt-2 pt-2 border-t border-slate-700/60 flex items-center justify-between text-xs">
+        <div>
+          <span id="empNameDisplay" class="font-bold text-white"></span>
+          <span id="empDeptDisplay" class="text-slate-400 ml-1"></span>
+        </div>
+        <div class="flex items-center space-x-1.5 shrink-0">
+          <div id="empStatusBadge" class="px-2 py-0.5 rounded text-[10px] font-semibold"></div>
+          <div id="empEnrolledBadge" class="px-2 py-0.5 rounded text-[10px] font-semibold"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Camera Viewport Box -->
+    <div id="cameraViewport" class="relative w-full aspect-[4/3] max-h-[360px] bg-black rounded-2xl overflow-hidden shadow-2xl border border-slate-700 flex items-center justify-center">
+
+      <!-- Video Element -->
+      <video id="videoElement" autoplay playsinline muted class="w-full h-full object-cover transform -scale-x-100"></video>
+      <canvas id="overlayCanvas" class="absolute inset-0 w-full h-full pointer-events-none transform -scale-x-100"></canvas>
+
+      <!-- Face Oval Guide -->
+      <div id="scannerOval" class="scanner-oval"></div>
+
+      <!-- Model Loading Screen -->
+      <div id="modelLoader" class="absolute inset-0 bg-slate-900/90 flex flex-col items-center justify-center p-6 text-center z-20">
+        <div class="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+        <p class="text-sm font-semibold text-slate-200" id="loaderText">Preparing user verification</p>
+        <p class="text-xs text-slate-400 mt-1">Please wait</p>
+      </div>
+
+      <!-- Live Instructions Overlay Badge -->
+      <div id="livenessInstruction" class="absolute top-3 inset-x-3 bg-slate-900/85 backdrop-blur-md border border-slate-700/80 rounded-xl px-3 py-2 text-center shadow-lg z-10">
+        <div id="instructionText" class="text-xs font-bold text-sky-300">
+          Center your face in the frame
+        </div>
+        <div id="instructionSub" class="text-[11px] text-slate-400 mt-0.5">
+          Use adequate lighting
+        </div>
+      </div>
+
+      <!-- Live Indicators at Bottom of Camera -->
+      <div class="absolute bottom-3 inset-x-3 flex items-center justify-between px-2 text-[11px] z-10">
+        <div id="badgeFace" class="bg-slate-900/80 backdrop-blur px-2.5 py-1 rounded-full text-slate-300 border border-slate-700 flex items-center space-x-1.5">
+          <span class="w-2 h-2 rounded-full bg-slate-500" id="dotFace"></span>
+          <span id="textFace">Face not detected</span>
+        </div>
+        <div id="badgeLiveness" class="bg-slate-900/80 backdrop-blur px-2.5 py-1 rounded-full text-slate-300 border border-slate-700 flex items-center space-x-1.5">
+          <span class="w-2 h-2 rounded-full bg-slate-500" id="dotLiveness"></span>
+          <span id="textLiveness">Verification pending</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- PUNCH CONTROLS (Punch Tab) -->
+    <div id="punchControls" class="space-y-2">
+      <div class="grid grid-cols-2 gap-3">
+        <button
+          id="btnPunchIn"
+          onclick="triggerPunch('IN')"
+          disabled
+          class="bg-emerald-600 disabled:bg-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed hover:bg-emerald-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition flex flex-col items-center justify-center"
+        >
+          <span class="text-base tracking-wide">Clock In</span>
+        </button>
+
+        <button
+          id="btnPunchOut"
+          onclick="triggerPunch('OUT')"
+          disabled
+          class="bg-amber-600 disabled:bg-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed hover:bg-amber-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition flex flex-col items-center justify-center"
+        >
+          <span class="text-base tracking-wide">Clock Out</span>
+        </button>
+      </div>
+      <p id="punchHint" class="text-center text-[11px] text-slate-500"></p>
+    </div>
+
+    <!-- ENROLL CONTROLS (Enroll Tab) -->
+    <div id="enrollControls" class="hidden space-y-2">
+      <button
+        id="btnEnroll"
+        onclick="triggerEnrollment()"
+        disabled
+        class="w-full bg-indigo-600 disabled:bg-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed hover:bg-indigo-500 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg transition flex items-center justify-center space-x-2"
+      >
+        <span>Register User</span>
+      </button>
+      <p id="enrollHint" class="text-center text-[11px] text-slate-400"></p>
+    </div>
+
+  </main>
+
+  <!-- Status / Success / Error Modal -->
+  <div id="statusModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl animate-fade-in">
+
+      <div id="modalIcon" class="w-14 h-14 mx-auto rounded-full bg-indigo-600/20 text-indigo-400 flex items-center justify-center text-2xl mb-3">
+        ⏳
+      </div>
+
+      <h3 id="modalTitle" class="text-lg font-bold text-white">Processing</h3>
+      <p id="modalMessage" class="text-xs text-slate-300 mt-2 leading-relaxed">Please wait...</p>
+
+      <!-- Active Animated Multi-Stage Progress Bar -->
+      <div id="modalProgressWrap" class="mt-4 w-full bg-slate-700/60 rounded-full h-2.5 overflow-hidden border border-slate-600/50">
+        <div id="modalProgressBar" class="bg-gradient-to-r from-indigo-500 via-sky-400 to-emerald-400 h-2.5 rounded-full transition-all duration-300 ease-out" style="width: 25%"></div>
+      </div>
+      <p id="modalStepText" class="text-[11px] font-medium text-indigo-300 mt-2">Verifying identity</p>
+
+      <div id="modalDetails" class="hidden mt-4 pt-3 border-t border-slate-700 text-left text-xs space-y-1.5 bg-slate-900/60 p-3 rounded-xl font-mono text-slate-300">
+        <div><span class="text-slate-500">Emp:</span> <span id="mEmp"></span></div>
+        <div><span class="text-slate-500">Action:</span> <span id="mPunch"></span></div>
+        <div><span class="text-slate-500">Time:</span> <span id="mTime"></span></div>
+        <div><span class="text-slate-500">Site:</span> <span id="mSite"></span></div>
+      </div>
+
+      <button id="modalBtnClose" onclick="closeModal()" class="hidden mt-5 w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl text-xs transition">
+        Done
+      </button>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT APPLICATION LOGIC -->
+  <script>
+    // -------------------------------------------------------------
+    // BACKEND API CONNECTION CONFIGURATION
+    // -------------------------------------------------------------
+    const DEFAULT_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxQTCzL5hY1ii5rHNsOq9eVHw5Ua-W3ST267ZYjQ2nOflJLoPwmzRQdfzafvPTboPRi/exec";
+    let storedUrl = localStorage.getItem("ghcl_api_url");
+    if (!storedUrl || storedUrl.includes("AKfycbyt6B2u7A1DtOhnERPnAcFDWcDnYgN5oVZZ")) {
+      storedUrl = DEFAULT_APPS_SCRIPT_URL;
+      localStorage.setItem("ghcl_api_url", DEFAULT_APPS_SCRIPT_URL);
+    }
+    let APPS_SCRIPT_URL = storedUrl;
+
+    // Unified API Dispatcher: Handles both inside-Apps-Script and external hosting (Netlify, GitHub Pages, Vercel)
+    async function callBackend(action, payloadData = {}) {
+      // 1. If running inside Google Apps Script iframe
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        return new Promise((resolve, reject) => {
+          if (action === 'getInitialData') {
+            google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getInitialData();
+          } else if (action === 'getEmployeeProfile') {
+            google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getEmployeeProfile(payloadData.query);
+          } else if (action === 'enrollFaceBiometrics') {
+            // FIX: livenessPassed is now passed to the server as the 4th argument
+            google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)
+              .enrollFaceBiometrics(payloadData.empId, payloadData.faceVector, payloadData.snapshotBase64, payloadData.livenessPassed);
+          } else if (action === 'submitAttendance') {
+            google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).submitAttendance(payloadData);
+          } else {
+            reject(new Error("Unknown action"));
+          }
+        });
+      }
+
+      // 2. If running externally on Netlify / GitHub Pages / Vercel:
+      const bodyString = JSON.stringify({
+        action: action,
+        ...payloadData
+      });
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      try {
+        // Use Content-Type text/plain to avoid CORS OPTIONS preflight block on Google Apps Script!
+        const response = await fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "text/plain;charset=utf-8"
+          },
+          body: bodyString,
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error("HTTP " + response.status + ": " + response.statusText);
+        }
+
+        return await response.json();
+      } catch (err) {
+        clearTimeout(timeoutId);
+        console.error("Backend fetch error:", err);
+        if (err.name === 'AbortError') {
+          throw new Error("The request timed out. Please try again.");
+        }
+        throw new Error("Unable to connect. Check your connection and try again.");
+      }
+    }
+
+    // -------------------------------------------------------------
+    // SYSTEM STATE VARIABLES
+    // -------------------------------------------------------------
+    let currentMode = 'punch'; // 'punch' or 'enroll'
+    let systemLocations = [
+      { id: "GHCL-NOIDA", name: "Corporate Office (Noida)", lat: 28.589722, lon: 77.312778, radius: 150 },
+      { id: "GHCL-AHMD", name: "Registered Office (Ahmedabad)", lat: 23.035833, lon: 72.558611, radius: 150 },
+      { id: "GHCL-PLANT", name: "Main Soda Ash Plant (Sutrapada)", lat: 20.855833, lon: 70.484444, radius: 600 },
+      { id: "GHCL-MINE", name: "Sutrapada Limestone Mine (Gorakhamdhi)", lat: 20.991944, lon: 70.622222, radius: 1000 }
+    ];
+    let faceThreshold = 0.50;
+    let currentUserProfile = null;
+    let userLocation = null;
+    let isGeofenceValid = false;
+    let isFaceInOval = false;
+    let nearestOffice = null;
+
+    // Face & Liveness Detection State (Strict Anti-Proxy: Blocks ID Cards, Photos, Screens)
+    let modelsLoaded = false;
+    let isFaceDetected = false;
+    let currentFaceDescriptor = null;
+    let livenessPassed = false;
+    let calibFrames = 0;
+    let baselineEAR = 0;
+    let baselineSmileRatio = 0;
+    let baselineMAR = 0;
+    let calibNoseX = 0;
+    let calibNoseY = 0;
+    let blinkState = 0; // 0 = uncalibrated, 1 = watching for blink, 2 = closure detected, 3 = verified
+    let blinkCloseTime = 0;
+    let smileFrames = 0;
+    let staticSpoofFrames = 0;
+    let consecutiveNoFaceFrames = 0;
+    let isSubmitting = false;
+
+    // ---- Fast blink liveness settings & state ----
+    const BLINK = {
+      closeRatio: 0.78,     // avg EAR must fall to <=78% of recent open-eye EAR
+      eachEyeRatio: 0.88,   // EACH eye must fall to <=88% (real blinks are symmetric)
+      reopenRatio: 0.90,    // eyes count as re-opened at >=90% of open EAR
+      maxCloseMs: 1500,     // blink must finish within 1.5 s
+      minOpenEAR: 0.17,     // ignore if "open" EAR is implausibly low
+      historyLen: 14,       // frames of open-eye history
+      maxFrameMotion: 0.18, // nose movement per frame / eye distance (card shaking)
+      maxBlinkShift: 0.25,  // head shift during blink / eye distance
+      maxVertChange: 0.10   // nose-length change (head tilt / photo tilt check)
+    };
+    let earHistory = [];
+    let blinkRef = null;
+    let blinkNose = null;
+    let blinkVert = 0;
+    let prevNose = null;
+    let lastBoxCenter = null;
+    let outOfOvalFrames = 0;
+    let descriptorLocked = false;
+
+    // DOM Elements
+    const video = document.getElementById('videoElement');
+    const overlayCanvas = document.getElementById('overlayCanvas');
+    const scannerOval = document.getElementById('scannerOval');
+    const modelLoader = document.getElementById('modelLoader');
+    const loaderText = document.getElementById('loaderText');
+    const instructionText = document.getElementById('instructionText');
+    const instructionSub = document.getElementById('instructionSub');
+    const badgeFace = document.getElementById('badgeFace');
+    const dotFace = document.getElementById('dotFace');
+    const textFace = document.getElementById('textFace');
+    const badgeLiveness = document.getElementById('badgeLiveness');
+    const dotLiveness = document.getElementById('dotLiveness');
+    const textLiveness = document.getElementById('textLiveness');
+    const btnPunchIn = document.getElementById('btnPunchIn');
+    const btnPunchOut = document.getElementById('btnPunchOut');
+    const btnEnroll = document.getElementById('btnEnroll');
+    const punchHint = document.getElementById('punchHint');
+
+    // 1. Clock Update
+    setInterval(() => {
+      const now = new Date();
+      document.getElementById('liveClock').textContent = now.toLocaleTimeString([], { hour12: false });
+    }, 1000);
+
+    // 2. Initialize App on Page Load
+    window.addEventListener('DOMContentLoaded', async () => {
+      initCamera();
+      loadFaceApiModels();
+      fetchInitialServerData();
+      refreshGPS();
+    });
+
+    // 3. Tab Switching
+    function switchTab(mode) {
+      currentMode = mode;
+      resetLivenessState();
+
+      const tabPunch = document.getElementById('tabPunch');
+      const tabEnroll = document.getElementById('tabEnroll');
+      const punchControls = document.getElementById('punchControls');
+      const enrollControls = document.getElementById('enrollControls');
+
+      if (mode === 'punch') {
+        tabPunch.className = "px-3 py-1.5 rounded-md font-medium bg-indigo-600 text-white transition";
+        tabEnroll.className = "px-3 py-1.5 rounded-md font-medium text-slate-400 hover:text-white transition";
+        punchControls.classList.remove('hidden');
+        enrollControls.classList.add('hidden');
+        instructionText.textContent = "Center your face in the frame";
+        instructionSub.textContent = "Blink or smile to verify your identity";
+      } else {
+        tabEnroll.className = "px-3 py-1.5 rounded-md font-medium bg-indigo-600 text-white transition";
+        tabPunch.className = "px-3 py-1.5 rounded-md font-medium text-slate-400 hover:text-white transition";
+        enrollControls.classList.remove('hidden');
+        punchControls.classList.add('hidden');
+        instructionText.textContent = "User registration";
+        instructionSub.textContent = "Center your face in the frame";
+      }
+      evaluateControls();
+    }
+
+    // 4. Fetch Locations and Config from Apps Script Backend
+    async function fetchInitialServerData() {
+      try {
+        const res = await callBackend('getInitialData');
+        if (res && res.success) {
+          if (res.locations && res.locations.length > 0) {
+            systemLocations = res.locations;
+          }
+          faceThreshold = res.faceThreshold || 0.50;
+          if (res.userEmail) {
+            document.getElementById('empInput').value = res.userEmail;
+            searchEmployee();
+          }
+          if (userLocation) validateGeofence();
+        }
+      } catch (err) {
+        console.warn("Could not fetch remote initial data (using fallback locations):", err);
+      }
+    }
+
+    // 5. GPS Geofencing Module
+    function refreshGPS() {
+      const geoTitle = document.getElementById('geoTitle');
+      const geoSubtitle = document.getElementById('geoSubtitle');
+      const geoPill = document.getElementById('geoPill');
+      const geoIcon = document.getElementById('geoIcon');
+
+      geoTitle.textContent = "Checking work location";
+      geoSubtitle.textContent = "Please wait";
+      geoPill.className = "bg-slate-800 border border-slate-700 rounded-xl p-3 flex items-center justify-between shadow-sm transition";
+      geoIcon.textContent = "🛰️";
+
+      if (!navigator.geolocation) {
+        geoTitle.textContent = "Location unavailable";
+        geoSubtitle.textContent = "This device does not support location services";
+        geoPill.className = "bg-rose-950/40 border border-rose-700/60 rounded-xl p-3 flex items-center justify-between";
+        geoIcon.textContent = "❌";
+        isGeofenceValid = false;
+        evaluateControls();
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          userLocation = {
+            lat: pos.coords.latitude,
+            lon: pos.coords.longitude,
+            accuracy: pos.coords.accuracy
+          };
+          validateGeofence();
+        },
+        (err) => {
+          geoTitle.textContent = "Location access required";
+          geoSubtitle.textContent = "Allow location access in your browser settings";
+          geoPill.className = "bg-rose-950/40 border border-rose-700/60 rounded-xl p-3 flex items-center justify-between";
+          geoIcon.textContent = "🚫";
+          isGeofenceValid = false;
+          evaluateControls();
+        },
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 5000 }
+      );
+    }
+
+    function validateGeofence() {
+      if (!userLocation || !systemLocations.length) return;
+
+      let nearest = null;
+      let minDistance = Infinity;
+
+      for (const loc of systemLocations) {
+        const d = haversineDistance(userLocation.lat, userLocation.lon, loc.lat, loc.lon);
+        if (d < minDistance) {
+          minDistance = d;
+          nearest = { ...loc, currentDistance: Math.round(d) };
+        }
+      }
+
+      nearestOffice = nearest;
+      const geoTitle = document.getElementById('geoTitle');
+      const geoSubtitle = document.getElementById('geoSubtitle');
+      const geoPill = document.getElementById('geoPill');
+      const geoIcon = document.getElementById('geoIcon');
+
+      if (nearest && nearest.currentDistance <= nearest.radius) {
+        isGeofenceValid = true;
+        geoTitle.textContent = "Location verified";
+        geoSubtitle.textContent = nearest.name;
+        geoPill.className = "bg-emerald-950/40 border border-emerald-600/60 rounded-xl p-3 flex items-center justify-between shadow-sm";
+        geoIcon.textContent = "🟢";
+      } else {
+        isGeofenceValid = false;
+        const distStr = nearest.currentDistance >= 1000
+          ? (nearest.currentDistance / 1000).toFixed(2) + " km"
+          : nearest.currentDistance + "m";
+        geoTitle.textContent = "Outside authorized area";
+        geoSubtitle.textContent = "Nearest site: " + nearest.name + " (" + distStr + " away)";
+        geoPill.className = "bg-rose-950/40 border border-rose-600/60 rounded-xl p-3 flex items-center justify-between shadow-sm";
+        geoIcon.textContent = "🔴";
+      }
+
+      evaluateControls();
+    }
+
+    function haversineDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    // 6. Employee Search & Verification
+    async function searchEmployee() {
+      const query = document.getElementById('empInput').value.trim();
+      if (!query) return;
+
+      const btn = document.getElementById('btnSearchEmp');
+      btn.textContent = "Searching...";
+      btn.disabled = true;
+
+      try {
+        const res = await callBackend('getEmployeeProfile', { query: query });
+        btn.textContent = "Verify";
+        btn.disabled = false;
+
+        if (res && res.success) {
+          currentUserProfile = res.employee;
+          displayProfile(res.employee);
+        } else {
+          currentUserProfile = null;
+          alert(res ? res.message : "Employee record not found. Check the details and try again.");
+          document.getElementById('empInfoStrip').classList.add('hidden');
+        }
+      } catch (err) {
+        btn.textContent = "Verify";
+        btn.disabled = false;
+        alert("Unable to verify employee details. Check your connection and try again.");
+      }
+      evaluateControls();
+    }
+
+    function displayProfile(emp) {
+      const strip = document.getElementById('empInfoStrip');
+      const name = document.getElementById('empNameDisplay');
+      const dept = document.getElementById('empDeptDisplay');
+      const badge = document.getElementById('empEnrolledBadge');
+      const statusBadge = document.getElementById('empStatusBadge');
+
+      strip.classList.remove('hidden');
+      name.textContent = emp.name + " (" + emp.id + ")";
+      dept.textContent = "• " + (emp.department || "General");
+
+      const isActive = String(emp.status || "").trim().toUpperCase() === "ACTIVE";
+      if (statusBadge) {
+        if (isActive) {
+          statusBadge.textContent = "Active";
+          statusBadge.className = "px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-700";
+        } else {
+          statusBadge.textContent = "Inactive";
+          statusBadge.className = "px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-950/80 text-rose-300 border border-rose-700";
+        }
+      }
+
+      if (emp.isEnrolled) {
+        badge.textContent = "User Registered";
+        badge.className = "px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-900/60 text-emerald-300 border border-emerald-700";
+      } else {
+        badge.textContent = "User Not Registered";
+        badge.className = "px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-900/60 text-amber-300 border border-amber-700";
+      }
+    }
+
+    // 7. Camera Initialization (Clean & Robust)
+    async function initCamera() {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("Camera access is not supported by this browser.");
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "user",
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          },
+          audio: false
+        });
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+          video.play();
+          onCameraReady();
+        };
+      } catch (err) {
+        console.error("Camera access error:", err);
+        alert("Camera unavailable. Allow camera access in your browser settings and reload the page.");
+      }
+    }
+
+    // 8. Face-API.js Model Loader
+    async function loadFaceApiModels(retryCount = 0) {
+      const primaryUrl = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model";
+      const fallbackUrl = "https://raw.githubusercontent.com/vladmandic/face-api/master/model";
+      const MODEL_URL = retryCount > 0 ? fallbackUrl : primaryUrl;
+
+      try {
+        loaderText.textContent = "Preparing user verification...";
+        // Initialize TensorFlow.js backend (defaults to webgl or falls back to cpu)
+        if (typeof faceapi !== 'undefined' && faceapi.tf) {
+          try {
+            await faceapi.tf.setBackend('webgl');
+          } catch (e) {
+            console.warn("WebGL not available, using CPU backend", e);
+            await faceapi.tf.setBackend('cpu');
+          }
+          await faceapi.tf.ready();
+        }
+
+        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+        await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+        await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+
+        modelsLoaded = true;
+        modelLoader.classList.add('hidden');
+        startFaceDetectionLoop();
+      } catch (err) {
+        console.error("Model load error:", err);
+        loaderText.textContent = "User verification unavailable";
+        const sub = document.querySelector('#modelLoader p.text-xs');
+        if (sub) sub.textContent = "Retrying...";
+        setTimeout(() => loadFaceApiModels(retryCount + 1), 2500);
+      }
+    }
+
+    function onCameraReady() {
+      overlayCanvas.width = video.videoWidth;
+      overlayCanvas.height = video.videoHeight;
+    }
+
+    // Face must be reasonably centred and sized inside the oval (relaxed so blinking is not interrupted)
+    function isDetectionInsideScannerOval(detection) {
+      const box = detection.detection && detection.detection.box;
+      if (!box || !video.videoWidth || !video.videoHeight) return false;
+
+      const videoRect = video.getBoundingClientRect();
+      const ovalRect = scannerOval.getBoundingClientRect();
+      const scale = Math.max(videoRect.width / video.videoWidth, videoRect.height / video.videoHeight);
+      const cropX = (video.videoWidth * scale - videoRect.width) / 2;
+      const cropY = (video.videoHeight * scale - videoRect.height) / 2;
+
+      // video is mirrored with CSS, so flip X
+      const mirroredCenterX = video.videoWidth - (box.x + box.width / 2);
+      const centerX = videoRect.left + mirroredCenterX * scale - cropX;
+      const centerY = videoRect.top + (box.y + box.height / 2) * scale - cropY;
+
+      const w = box.width * scale;
+      const h = box.height * scale;
+      if (w > ovalRect.width * 1.4 || h > ovalRect.height * 1.4) return false; // too close
+      if (w < ovalRect.width * 0.4) return false;                              // too far
+
+      const nx = (centerX - (ovalRect.left + ovalRect.width / 2)) / (ovalRect.width / 2);
+      const ny = (centerY - (ovalRect.top + ovalRect.height / 2)) / (ovalRect.height / 2);
+      return nx * nx + ny * ny <= 0.6;
+    }
+
+    // 9. Real-Time Detection & Active Liveness Loop (FAST)
+    // Before the blink passes only light detection + landmarks run (small input, no delay).
+    // The heavy 128-D descriptor is computed once AFTER liveness passes and then locked.
+    let isDetecting = false;
+    async function startFaceDetectionLoop() {
+      if (!modelsLoaded || video.paused || video.ended || isDetecting) {
+        requestAnimationFrame(startFaceDetectionLoop);
+        return;
+      }
+      isDetecting = true;
+
+      try {
+        const wantDescriptor = livenessPassed && !descriptorLocked &&
+          ((currentMode === 'punch' && currentUserProfile && currentUserProfile.isEnrolled && currentUserProfile.faceDescriptor) ||
+           currentMode === 'enroll');
+
+        const options = new faceapi.TinyFaceDetectorOptions({
+          inputSize: wantDescriptor ? 224 : 160,
+          scoreThreshold: 0.35
+        });
+
+        let task = faceapi.detectSingleFace(video, options).withFaceLandmarks();
+        if (wantDescriptor) task = task.withFaceDescriptor();
+        const detection = await task;
+
+        if (detection) {
+          consecutiveNoFaceFrames = 0;
+          isFaceDetected = true;
+          isFaceInOval = isDetectionInsideScannerOval(detection);
+
+          // Face swap protection after liveness: sudden jump in face position resets everything
+          const box = detection.detection.box;
+          const center = { x: box.x + box.width / 2, y: box.y + box.height / 2, w: box.width };
+          if (livenessPassed && lastBoxCenter &&
+              Math.hypot(center.x - lastBoxCenter.x, center.y - lastBoxCenter.y) > lastBoxCenter.w * 0.6) {
+            currentFaceDescriptor = null;
+            resetLivenessState();
+          }
+          lastBoxCenter = center;
+
+          if (isFaceInOval) {
+            outOfOvalFrames = 0;
+            dotFace.className = "w-2 h-2 rounded-full bg-emerald-400";
+            textFace.textContent = "Face centered";
+            scannerOval.classList.add('active');
+            scannerOval.classList.remove('error');
+
+            if (livenessPassed) {
+              if (detection.descriptor && !descriptorLocked) {
+                currentFaceDescriptor = detection.descriptor;
+                descriptorLocked = true;
+              }
+            } else {
+              processLiveness(detection.landmarks);
+            }
+          } else {
+            outOfOvalFrames++;
+            dotFace.className = "w-2 h-2 rounded-full bg-rose-400";
+            textFace.textContent = "Center face in oval";
+            scannerOval.classList.remove('active');
+            scannerOval.classList.add('error');
+            // small grace so one jittery frame does not wipe a blink in progress
+            if (outOfOvalFrames > 6) {
+              currentFaceDescriptor = null;
+              resetLivenessState();
+            }
+          }
+
+          updateStatusGuidance();
+        } else {
+          // Allow up to 8 dropped frames
+          consecutiveNoFaceFrames++;
+          isFaceInOval = false;
+          if (consecutiveNoFaceFrames > 8) {
+            isFaceDetected = false;
+            currentFaceDescriptor = null;
+            resetLivenessState();
+            dotFace.className = "w-2 h-2 rounded-full bg-slate-500";
+            textFace.textContent = "Face not detected";
+            scannerOval.classList.remove('active', 'error');
+
+            instructionText.textContent = "Center your face in the frame";
+            instructionSub.textContent = "Keep your face visible and well lit";
+            instructionText.className = "text-xs font-bold text-sky-300";
+          }
+        }
+
+        evaluateControls();
+      } catch (err) {
+        console.warn("Detection loop error:", err);
+      } finally {
+        isDetecting = false;
+        requestAnimationFrame(startFaceDetectionLoop); // no artificial delay
+      }
+    }
+
+    // Dynamic Guidance & Status Updates
+    function updateStatusGuidance() {
+      const isActive = currentUserProfile && String(currentUserProfile.status || "").trim().toUpperCase() === "ACTIVE";
+
+      if (isFaceDetected && !isFaceInOval) {
+        instructionText.textContent = "Center your face in the oval";
+        instructionSub.textContent = "Keep your full face inside the guide";
+        instructionText.className = "text-xs font-bold text-amber-300";
+        return;
+      }
+
+      if (currentMode === 'punch') {
+        if (!currentUserProfile) {
+          instructionText.textContent = "Verify your employee details";
+          instructionSub.textContent = "Enter your employee ID or work email";
+          instructionText.className = "text-xs font-bold text-sky-300";
+        } else if (!isActive) {
+          scannerOval.classList.add('error');
+          instructionText.textContent = "Account inactive";
+          instructionSub.textContent = "Contact HR for assistance";
+          instructionText.className = "text-xs font-bold text-rose-400";
+        } else if (!currentUserProfile.isEnrolled) {
+          instructionText.textContent = "User registration required";
+          instructionSub.textContent = "Select User Registration to continue";
+          instructionText.className = "text-xs font-bold text-amber-300";
+        } else if (!livenessPassed) {
+          instructionText.textContent = "Blink or smile now";
+          instructionSub.textContent = "Live face only - photos and ID cards are rejected";
+          instructionText.className = "text-xs font-bold text-amber-300";
+        } else if (!currentFaceDescriptor) {
+          instructionText.textContent = "Checking your face";
+          instructionSub.textContent = "Hold still for a moment";
+          instructionText.className = "text-xs font-bold text-sky-300";
+        } else {
+          const dist = calculateEuclidean(currentUserProfile.faceDescriptor, currentFaceDescriptor);
+          if (dist <= faceThreshold) {
+            scannerOval.classList.remove('error');
+            instructionText.textContent = "Identity verified";
+            instructionSub.textContent = "You may clock in or out";
+            instructionText.className = "text-xs font-bold text-emerald-400";
+          } else {
+            scannerOval.classList.add('error');
+            instructionText.textContent = "Face does not match this profile";
+            instructionSub.textContent = "Check the employee details or contact HR";
+            instructionText.className = "text-xs font-bold text-rose-400";
+          }
+        }
+      } else if (currentMode === 'enroll') {
+        if (!currentUserProfile) {
+          instructionText.textContent = "User registration";
+          instructionSub.textContent = "Verify your employee details to continue";
+          instructionText.className = "text-xs font-bold text-sky-300";
+        } else if (!isActive) {
+          scannerOval.classList.add('error');
+          instructionText.textContent = "Account inactive";
+          instructionSub.textContent = "Contact HR for assistance";
+          instructionText.className = "text-xs font-bold text-rose-400";
+        } else if (currentUserProfile.isEnrolled) {
+          instructionText.textContent = "User already registered";
+          instructionSub.textContent = "Contact HR if an update is required";
+          instructionText.className = "text-xs font-bold text-amber-300";
+        } else if (!livenessPassed) {
+          instructionText.textContent = "Blink or smile now";
+          instructionSub.textContent = "Live face only - photos and ID cards are rejected";
+          instructionText.className = "text-xs font-bold text-amber-300";
+        } else {
+          instructionText.textContent = "Identity verified";
+          instructionSub.textContent = "Select Register User to complete setup";
+          instructionText.className = "text-xs font-bold text-emerald-400";
+        }
+      }
+    }
+
+    // 10. FAST ACTIVE LIVENESS (blink or smile) with anti photo / ID card / screen-tilt checks
+    function processLiveness(landmarks) {
+      if (livenessPassed) return;
+
+      const leftEye = landmarks.getLeftEye();
+      const rightEye = landmarks.getRightEye();
+      const mouth = landmarks.getMouth();
+      const nose = landmarks.getNose();
+      const noseTip = nose[6];
+
+      // 1. Minimum face size (blocks small photos / ID card thumbnails held far away)
+      const eyeDist = Math.hypot(leftEye[0].x - rightEye[3].x, leftEye[0].y - rightEye[3].y) || 1;
+      if (eyeDist < 45) {
+        textLiveness.textContent = "Move closer to the camera";
+        dotLiveness.className = "w-2 h-2 rounded-full bg-amber-400";
+        earHistory = [];
+        prevNose = null;
+        return;
+      }
+
+      // 2. Measurements (all normalised by face size)
+      const leftEAR = calculateEAR(leftEye);
+      const rightEAR = calculateEAR(rightEye);
+      const ear = (leftEAR + rightEAR) / 2;
+      const mouthWidth = Math.hypot(mouth[0].x - mouth[6].x, mouth[0].y - mouth[6].y);
+      const mouthHeight = Math.hypot(mouth[3].x - mouth[9].x, mouth[3].y - mouth[9].y);
+      const smileRatio = mouthWidth / eyeDist;
+      const mar = mouthHeight / (mouthWidth || 1);
+      const vert = Math.hypot(nose[0].x - noseTip.x, nose[0].y - noseTip.y) / eyeDist; // vertical face size
+
+      // 3. Per-frame motion: shaking / waving a photo or card -> restart tracking
+      let motion = 0;
+      if (prevNose) motion = Math.hypot(noseTip.x - prevNose.x, noseTip.y - prevNose.y) / eyeDist;
+      prevNose = { x: noseTip.x, y: noseTip.y };
+      if (motion > BLINK.maxFrameMotion) {
+        earHistory = [];
+        blinkState = 0;
+        smileFrames = 0;
+        textLiveness.textContent = "Hold still";
+        dotLiveness.className = "w-2 h-2 rounded-full bg-sky-400";
+        return;
+      }
+
+      // 4. Rolling open-eye history (self-corrects, no long calibration wait)
+      earHistory.push({ e: ear, l: leftEAR, r: rightEAR, v: vert });
+      if (earHistory.length > BLINK.historyLen) earHistory.shift();
+
+      // smile baseline: 2 quick frames, then slow drift update
+      if (calibFrames < 2) {
+        baselineSmileRatio = (baselineSmileRatio * calibFrames + smileRatio) / (calibFrames + 1);
+        baselineMAR = (baselineMAR * calibFrames + mar) / (calibFrames + 1);
+        calibFrames++;
+      } else if (blinkState < 2 && smileFrames === 0 && Math.abs(smileRatio - baselineSmileRatio) < 0.03) {
+        baselineSmileRatio = baselineSmileRatio * 0.9 + smileRatio * 0.1;
+        baselineMAR = baselineMAR * 0.9 + mar * 0.1;
+      }
+
+      if (earHistory.length < 3) {
+        textLiveness.textContent = "Hold still";
+        dotLiveness.className = "w-2 h-2 rounded-full bg-sky-400";
+        return;
+      }
+
+      // -------------------------------------------------------------
+      // ACTION A: BLINK (eyes close then re-open, both eyes, head steady)
+      // A photo / ID card is static, so its eyes never close.
+      // -------------------------------------------------------------
+      if (blinkState < 2) {
+        blinkState = 1;
+        const prev = earHistory.slice(0, -1);
+        const refE = Math.max(...earHistory.map(h => h.e));
+        const refL = Math.max(...earHistory.map(h => h.l));
+        const refR = Math.max(...earHistory.map(h => h.r));
+        const vertRef = prev.reduce((s, h) => s + h.v, 0) / prev.length;
+
+        const eyesClosed =
+          refE >= BLINK.minOpenEAR &&
+          ear <= refE * BLINK.closeRatio &&
+          leftEAR <= refL * BLINK.eachEyeRatio &&
+          rightEAR <= refR * BLINK.eachEyeRatio;
+
+        // If the whole face got shorter, it is a tilting photo/card, not a blink
+        const faceShapeStable = Math.abs(vert - vertRef) / (vertRef || 1) <= BLINK.maxVertChange;
+
+        if (eyesClosed && faceShapeStable) {
+          blinkState = 2;
+          blinkCloseTime = Date.now();
+          blinkRef = { e: refE, l: refL, r: refR };
+          blinkNose = { x: noseTip.x, y: noseTip.y };
+          blinkVert = vertRef;
+          dotLiveness.className = "w-2 h-2 rounded-full bg-indigo-400 animate-ping";
+          textLiveness.textContent = "Open your eyes";
+        } else {
+          dotLiveness.className = "w-2 h-2 rounded-full bg-amber-400 animate-pulse";
+          textLiveness.textContent = "Blink or smile to verify";
+        }
+      } else if (blinkState === 2) {
+        const elapsed = Date.now() - blinkCloseTime;
+        if (ear >= blinkRef.e * BLINK.reopenRatio) {
+          const headShift = Math.hypot(noseTip.x - blinkNose.x, noseTip.y - blinkNose.y) / eyeDist;
+          const vertChange = Math.abs(vert - blinkVert) / (blinkVert || 1);
+          if (elapsed <= BLINK.maxCloseMs && headShift <= BLINK.maxBlinkShift && vertChange <= BLINK.maxVertChange) {
+            confirmLiveness("Live Person: Blink Verified");
+            return;
+          }
+          blinkState = 1;
+        } else if (elapsed > BLINK.maxCloseMs) {
+          blinkState = 1;
+          earHistory = [];
+        }
+      }
+
+      // -------------------------------------------------------------
+      // ACTION B: SMILE (mouth widens vs. the person's own baseline)
+      // -------------------------------------------------------------
+      if (blinkState < 2) {
+        const smileDelta = smileRatio - baselineSmileRatio;
+        const marDelta = mar - baselineMAR;
+        const isDynamicSmile = (smileDelta >= 0.08) || (marDelta >= 0.10 && smileDelta >= 0.02);
+        if (isDynamicSmile) {
+          smileFrames++;
+          textLiveness.textContent = "Smile detected";
+          dotLiveness.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
+          if (smileFrames >= 2) {
+            confirmLiveness("Live Person: Smile Verified");
+            return;
+          }
+        } else {
+          smileFrames = 0;
+        }
+      }
+    }
+
+    function confirmLiveness(statusLabel) {
+      livenessPassed = true;
+      blinkState = 3;
+      dotLiveness.className = "w-2 h-2 rounded-full bg-emerald-400";
+      textLiveness.textContent = "Live check passed";
+      badgeLiveness.className = "bg-emerald-950/80 backdrop-blur px-2.5 py-1 rounded-full text-emerald-300 border border-emerald-700 flex items-center space-x-1.5 shadow-sm";
+
+      scannerOval.classList.add('active');
+      scannerOval.classList.remove('error');
+    }
+
+    function calculateEAR(eye) {
+      const dist1 = euclideanPoints(eye[1], eye[5]);
+      const dist2 = euclideanPoints(eye[2], eye[4]);
+      const horizontal = euclideanPoints(eye[0], eye[3]);
+      return horizontal === 0 ? 0 : (dist1 + dist2) / (2.0 * horizontal);
+    }
+
+    function euclideanPoints(p1, p2) {
+      const dx = p1.x - p2.x;
+      const dy = p1.y - p2.y;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    function calculateEuclidean(v1, v2) {
+      if (!v1 || !v2 || v1.length !== v2.length) return 999;
+      let sum = 0;
+      for (let i = 0; i < v1.length; i++) {
+        const d = v1[i] - v2[i];
+        sum += d * d;
+      }
+      return Math.sqrt(sum);
+    }
+
+    function resetLivenessState() {
+      livenessPassed = false;
+      currentFaceDescriptor = null;
+      descriptorLocked = false;
+      calibFrames = 0;
+      baselineEAR = 0;
+      baselineSmileRatio = 0;
+      baselineMAR = 0;
+      calibNoseX = 0;
+      calibNoseY = 0;
+      blinkState = 0;
+      blinkCloseTime = 0;
+      smileFrames = 0;
+      staticSpoofFrames = 0;
+      earHistory = [];
+      blinkRef = null;
+      blinkNose = null;
+      prevNose = null;
+      lastBoxCenter = null;
+      outOfOvalFrames = 0;
+      dotLiveness.className = "w-2 h-2 rounded-full bg-slate-500";
+      textLiveness.textContent = "Verification pending";
+      badgeLiveness.className = "bg-slate-900/80 backdrop-blur px-2.5 py-1 rounded-full text-slate-300 border border-slate-700 flex items-center space-x-1.5";
+    }
+
+    // 11. Evaluate Button States (STRICT ANTI-PROXY & STATUS CHECK)
+    function evaluateControls() {
+      const isActive = currentUserProfile && String(currentUserProfile.status || "").trim().toUpperCase() === "ACTIVE";
+
+      if (currentMode === 'punch') {
+        const hasValidUser = currentUserProfile && isActive && currentUserProfile.isEnrolled;
+        const faceMatch = hasValidUser && currentFaceDescriptor && currentUserProfile.faceDescriptor &&
+                          isFaceDetected && isFaceInOval &&
+                          calculateEuclidean(currentUserProfile.faceDescriptor, currentFaceDescriptor) <= faceThreshold;
+
+        // STRICT ANTI-PROXY: Active Account + Geofence + Live Human Blink/Smile + Biometric Match ALL MANDATORY!
+        const canPunch = isActive && isGeofenceValid && isFaceDetected && isFaceInOval && livenessPassed && faceMatch && !isSubmitting;
+
+        btnPunchIn.disabled = !canPunch;
+        btnPunchOut.disabled = !canPunch;
+
+        if (!currentUserProfile) {
+          punchHint.textContent = "Enter and verify your Employee ID first.";
+        } else if (!isActive) {
+          punchHint.textContent = "Account inactive. Contact HR for assistance.";
+        } else if (!currentUserProfile.isEnrolled) {
+          punchHint.innerHTML = "User registration required. <a href='javascript:switchTab(\"enroll\")' class='text-indigo-400 underline font-semibold'>Register User</a>.";
+        } else if (!isGeofenceValid) {
+          punchHint.textContent = "Move to an authorized work site to record attendance.";
+        } else if (!isFaceDetected || !isFaceInOval) {
+          punchHint.textContent = "Center your face inside the oval.";
+        } else if (!livenessPassed) {
+          punchHint.textContent = "Blink or smile to verify your identity.";
+        } else if (!currentFaceDescriptor) {
+          punchHint.textContent = "Checking your face...";
+        } else if (!faceMatch) {
+          punchHint.textContent = "Face does not match this profile. Check your employee details or contact HR.";
+        } else {
+          punchHint.textContent = "Identity verified. You may record attendance.";
+        }
+      } else {
+        // STRICT ENROLLMENT: Active Account + Profile + Face Detected + Live Human Presence MANDATORY!
+        const canEnroll = currentUserProfile && isActive && !currentUserProfile.isEnrolled && isFaceDetected && isFaceInOval && livenessPassed && !isSubmitting;
+        btnEnroll.disabled = !canEnroll;
+        if (canEnroll) {
+          btnEnroll.className = "w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-emerald-600/30 transition flex items-center justify-center space-x-2";
+          btnEnroll.innerHTML = "<span>Identity Verified · Register User</span>";
+        } else {
+          btnEnroll.className = "w-full bg-indigo-600 disabled:bg-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed hover:bg-indigo-500 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg transition flex items-center justify-center space-x-2";
+          btnEnroll.innerHTML = "<span>Register User</span>";
+        }
+
+        const enrollHint = document.getElementById('enrollHint');
+        if (enrollHint) {
+          if (!currentUserProfile) {
+            enrollHint.textContent = "Verify your employee details to continue.";
+            enrollHint.className = "text-center text-[11px] text-amber-400";
+          } else if (!isActive) {
+            enrollHint.textContent = "Account inactive. Contact HR for assistance.";
+            enrollHint.className = "text-center text-[11px] text-rose-400 font-semibold";
+          } else if (currentUserProfile.isEnrolled) {
+            enrollHint.textContent = "User already registered. Contact HR if an update is required.";
+            enrollHint.className = "text-center text-[11px] text-rose-400 font-semibold";
+          } else if (!isFaceDetected || !isFaceInOval) {
+            enrollHint.textContent = "Center your face inside the oval.";
+            enrollHint.className = "text-center text-[11px] text-sky-300";
+          } else if (!livenessPassed) {
+            enrollHint.textContent = "Blink or smile to verify your identity.";
+            enrollHint.className = "text-center text-[11px] text-amber-300 font-semibold";
+          } else {
+            enrollHint.textContent = "Identity verified. Select Register user to continue.";
+            enrollHint.className = "text-center text-[11px] text-emerald-400 font-semibold";
+          }
+        }
+      }
+    }
+
+    // 12. Capture Snapshot Image from Video Stream (High-Speed Optimized Thumbnail)
+    function captureVideoFrame() {
+      const snapCanvas = document.createElement('canvas');
+      // 240x320 at 0.45 quality drops payload size from ~200KB down to ~10KB (a 95% reduction!)
+      snapCanvas.width = 240;
+      snapCanvas.height = 320;
+      const ctx = snapCanvas.getContext('2d');
+      ctx.translate(snapCanvas.width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, 0, 0, snapCanvas.width, snapCanvas.height);
+      return snapCanvas.toDataURL('image/jpeg', 0.45);
+    }
+
+    // 13. Submit Punch In / Punch Out
+    async function triggerPunch(type) {
+      if (isSubmitting) return;
+
+      if (!currentUserProfile || String(currentUserProfile.status || "").trim().toUpperCase() !== "ACTIVE") {
+        showModalError("Account inactive. Contact HR for assistance.");
+        return;
+      }
+
+      if (!isFaceDetected || !isFaceInOval) {
+        showModalError("Center your face inside the oval and try again.");
+        return;
+      }
+
+      if (!livenessPassed) {
+        showModalError("Blink or smile to verify your identity.");
+        return;
+      }
+
+      isSubmitting = true;
+      evaluateControls();
+
+      showModalProgress("Recording attendance", "Verifying your identity...", 20, "Identity check");
+      const snapshot = captureVideoFrame();
+
+      if (!currentFaceDescriptor) {
+        updateModalProgress(35, "Identity check", "Verifying your identity...");
+        try {
+          const fullDetection = await faceapi
+            .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.35 }))
+            .withFaceLandmarks()
+            .withFaceDescriptor();
+          if (fullDetection && fullDetection.descriptor) {
+            currentFaceDescriptor = fullDetection.descriptor;
+          }
+        } catch (e) {
+          console.warn("Descriptor fallback failed:", e);
+        }
+      }
+
+      if (!currentFaceDescriptor) {
+        isSubmitting = false;
+        evaluateControls();
+        showModalError("Could not verify face. Please look directly at the camera and try again.");
+        return;
+      }
+
+      updateModalProgress(55, "Location check", "Confirming your work location...");
+
+      const payload = {
+        empId: currentUserProfile.id,
+        punchType: type,
+        userLat: userLocation.lat,
+        userLon: userLocation.lon,
+        liveFaceVector: Array.from(currentFaceDescriptor),
+        livenessPassed: livenessPassed,
+        snapshotBase64: snapshot
+      };
+
+      // Active progress animator so the modal feels alive while backend responds
+      let progressVal = 55;
+      const progressTicker = setInterval(() => {
+        if (progressVal < 92) {
+          progressVal += 6;
+          const label = progressVal > 80 ? "Saving your attendance record..." : "Confirming your identity and location...";
+          updateModalProgress(progressVal, progressVal > 80 ? "Saving record" : "Final verification", label);
+        }
+      }, 350);
+
+      try {
+        const res = await callBackend('submitAttendance', payload);
+        clearInterval(progressTicker);
+        isSubmitting = false;
+
+        if (res && res.success) {
+          updateModalProgress(100, "Complete", "Attendance recorded successfully.");
+          setTimeout(() => {
+            showModalSuccess(res.data);
+            resetLivenessState(); // next punch needs a fresh live check
+          }, 300);
+        } else {
+          if (res && res.debug) console.warn("Server detail:", res.debug);
+          showModalError(res ? res.message : "Submission failed.");
+        }
+      } catch (err) {
+        clearInterval(progressTicker);
+        isSubmitting = false;
+        showModalError("Unable to record attendance. Check your connection and try again.");
+      }
+      evaluateControls();
+    }
+
+    // 14. Trigger Face Biometric Enrollment
+    async function triggerEnrollment() {
+      if (isSubmitting) return;
+
+      if (!currentUserProfile) {
+        alert("Verify your employee details to continue.");
+        return;
+      }
+
+      if (String(currentUserProfile.status || "").trim().toUpperCase() !== "ACTIVE") {
+        alert("Account inactive. Contact HR for assistance.");
+        return;
+      }
+
+      if (currentUserProfile.isEnrolled) {
+        alert("User already registered. Contact HR if an update is required.");
+        return;
+      }
+
+      if (!isFaceDetected || !isFaceInOval) {
+        alert("Center your face inside the oval and try again.");
+        return;
+      }
+
+      if (!livenessPassed) {
+        alert("Blink or smile to verify your identity.");
+        return;
+      }
+
+      isSubmitting = true;
+      evaluateControls();
+      showModalProgress("Registering User", "Verifying your identity...", 25, "Identity check");
+
+      try {
+        let descriptor = currentFaceDescriptor;
+
+        // Compute fresh 128-D vector directly from video frame if not already cached
+        if (!descriptor) {
+          const fullDetection = await faceapi
+            .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.35 }))
+            .withFaceLandmarks()
+            .withFaceDescriptor();
+
+          if (fullDetection && fullDetection.descriptor) {
+            descriptor = fullDetection.descriptor;
+          }
+        }
+
+        if (!descriptor) {
+          isSubmitting = false;
+          evaluateControls();
+          showModalError("Could not detect face clearly. Please look directly into the oval and try again.");
+          return;
+        }
+
+        updateModalProgress(55, "Saving registration", "Saving your User registration...");
+
+        const snapshot = captureVideoFrame();
+        const vectorArray = Array.from(descriptor);
+
+        // Progress animator for enrollment
+        let progressVal = 55;
+        const progressTicker = setInterval(() => {
+          if (progressVal < 92) {
+            progressVal += 7;
+            updateModalProgress(progressVal, "Saving registration", "Completing User registration...");
+          }
+        }, 350);
+
+        let res;
+        try {
+          res = await callBackend('enrollFaceBiometrics', {
+            empId: currentUserProfile.id,
+            faceVector: vectorArray,
+            snapshotBase64: snapshot,
+            livenessPassed: livenessPassed
+          });
+        } finally {
+          clearInterval(progressTicker);
+        }
+        isSubmitting = false;
+
+        if (res && res.success) {
+          updateModalProgress(100, "Complete", "User registered successfully.");
+          showModal("Registration complete", res.message || "User registered successfully.");
+          document.getElementById('modalBtnClose').classList.remove('hidden');
+          currentUserProfile.isEnrolled = true;
+          currentUserProfile.faceDescriptor = vectorArray;
+          displayProfile(currentUserProfile);
+          setTimeout(() => {
+            closeModal();
+            switchTab('punch');
+          }, 1500);
+        } else {
+          showModalError(res ? res.message : "Enrollment failed.");
+        }
+      } catch (err) {
+        isSubmitting = false;
+        showModalError("Unable to register user. Check your connection and try again.");
+      }
+      evaluateControls();
+    }
+
+    // 15. Modal Helpers
+    function showModalProgress(title, msg, percent, stepText) {
+      const modal = document.getElementById('statusModal');
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('modalMessage').textContent = msg;
+      document.getElementById('modalIcon').textContent = "⏳";
+      document.getElementById('modalIcon').className = "w-14 h-14 mx-auto rounded-full bg-indigo-600/20 text-indigo-400 flex items-center justify-center text-2xl mb-3 animate-pulse";
+
+      const progWrap = document.getElementById('modalProgressWrap');
+      const progBar = document.getElementById('modalProgressBar');
+      const stepLabel = document.getElementById('modalStepText');
+      if (progWrap) progWrap.classList.remove('hidden');
+      if (progBar) progBar.style.width = (percent || 20) + "%";
+      if (stepLabel) {
+        stepLabel.classList.remove('hidden');
+        stepLabel.textContent = stepText || "";
+      }
+
+      document.getElementById('modalDetails').classList.add('hidden');
+      document.getElementById('modalBtnClose').classList.add('hidden');
+      modal.classList.remove('hidden');
+    }
+
+    function updateModalProgress(percent, stepText, message) {
+      const progBar = document.getElementById('modalProgressBar');
+      const stepLabel = document.getElementById('modalStepText');
+      const msgEl = document.getElementById('modalMessage');
+      if (progBar && percent !== undefined) progBar.style.width = percent + "%";
+      if (stepLabel && stepText) stepLabel.textContent = stepText;
+      if (msgEl && message) msgEl.textContent = message;
+    }
+
+    function showModal(title, msg) {
+      const modal = document.getElementById('statusModal');
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('modalMessage').textContent = msg;
+      document.getElementById('modalIcon').textContent = "⏳";
+      document.getElementById('modalIcon').className = "w-14 h-14 mx-auto rounded-full bg-indigo-600/20 text-indigo-400 flex items-center justify-center text-2xl mb-3";
+
+      const progWrap = document.getElementById('modalProgressWrap');
+      const stepLabel = document.getElementById('modalStepText');
+      if (progWrap) progWrap.classList.add('hidden');
+      if (stepLabel) stepLabel.classList.add('hidden');
+
+      document.getElementById('modalDetails').classList.add('hidden');
+      document.getElementById('modalBtnClose').classList.add('hidden');
+      modal.classList.remove('hidden');
+    }
+
+    function showModalSuccess(data) {
+      const progWrap = document.getElementById('modalProgressWrap');
+      const stepLabel = document.getElementById('modalStepText');
+      if (progWrap) progWrap.classList.add('hidden');
+      if (stepLabel) stepLabel.classList.add('hidden');
+
+      document.getElementById('modalIcon').textContent = "✅";
+      document.getElementById('modalIcon').className = "w-14 h-14 mx-auto rounded-full bg-emerald-600/20 text-emerald-400 flex items-center justify-center text-2xl mb-3";
+      document.getElementById('modalTitle').textContent = "Attendance recorded";
+      document.getElementById('modalMessage').textContent = "Your attendance has been recorded successfully.";
+
+      document.getElementById('mEmp').textContent = data.employeeName;
+      document.getElementById('mPunch').textContent = data.punchType;
+      document.getElementById('mTime').textContent = data.time;
+      document.getElementById('mSite').textContent = data.location;
+
+      document.getElementById('modalDetails').classList.remove('hidden');
+      document.getElementById('modalBtnClose').classList.remove('hidden');
+    }
+
+    function showModalError(msg) {
+      const progWrap = document.getElementById('modalProgressWrap');
+      const stepLabel = document.getElementById('modalStepText');
+      if (progWrap) progWrap.classList.add('hidden');
+      if (stepLabel) stepLabel.classList.add('hidden');
+
+      document.getElementById('modalIcon').textContent = "❌";
+      document.getElementById('modalIcon').className = "w-14 h-14 mx-auto rounded-full bg-rose-600/20 text-rose-400 flex items-center justify-center text-2xl mb-3";
+      document.getElementById('modalTitle').textContent = "Unable to complete";
+      document.getElementById('modalMessage').textContent = msg;
+      document.getElementById('modalDetails').classList.add('hidden');
+      document.getElementById('modalBtnClose').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('statusModal').classList.add('hidden');
+    }
+  </script>
+</body>
+</html>
